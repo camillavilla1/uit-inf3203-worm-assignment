@@ -116,14 +116,24 @@ func WormGateHandler(w http.ResponseWriter, r *http.Request) {
 	// Read from http POST
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Panic("Could not read body from http POST", err)
+		// Could not read body from POST.
+		// Probably the segment was killed while trying to send.
+		// That's the worm's problem, not ours. So just abort.
+		log.Print("Error reading payload.", err)
+		return
 	}
 
 	// Write tarball to file
-	file.Write(body)
+	_, err = file.Write(body)
+	if err != nil {
+		log.Print("Error writing payload file.", err)
+		return
+	}
+
 	err = file.Close()
 	if err != nil {
-		log.Panic("Error closing segment executable", err)
+		log.Print("Error closing payload file.", err)
+		return
 	}
 
 	// extract segment
@@ -132,7 +142,8 @@ func WormGateHandler(w http.ResponseWriter, r *http.Request) {
 	tarCmd := exec.Command(cmdline[0], cmdline[1:]...)
 	err = tarCmd.Run()
 	if err != nil {
-		log.Panic("Error extracting segment ", err)
+		log.Print("Error extracting segment.", err)
+		return
 	}
 
 	// Start command, do not wait for it to complete
@@ -146,7 +157,8 @@ func WormGateHandler(w http.ResponseWriter, r *http.Request) {
 	//cmd.Dir = path
 	err = cmd.Start()
 	if err != nil {
-		log.Panic("Error starting segment ", err)
+		log.Print("Error starting segment ", err)
+		return
 	}
 	runningSegment.p = cmd.Process
 
