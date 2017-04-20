@@ -89,6 +89,7 @@ func sendSegment(address string) {
 }
 
 func startSegmentServer() {
+	//func HandleFunc(pattern string, handler func(ResponseWriter, *Request))
 	http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/targetsegments", targetSegmentsHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
