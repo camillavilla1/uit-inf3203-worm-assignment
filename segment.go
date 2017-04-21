@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync/atomic"
+	"math/rand"
+	"time"
 )
 
 var wormgatePort string
@@ -19,6 +21,9 @@ var segmentPort string
 var hostname string
 
 var targetSegments int32
+var actualSegments int32
+
+var startedNodes []string
 
 
 func main() {
@@ -48,6 +53,9 @@ func main() {
 	default:
 		log.Fatalf("Unknown mode %q\n", os.Args[1])
 	}
+
+	actualSegments = 0
+
 }
 
 func addCommonFlags(flagset *flag.FlagSet) {
@@ -55,10 +63,39 @@ func addCommonFlags(flagset *flag.FlagSet) {
 	flagset.StringVar(&segmentPort, "sp", ":8182", "segment port (prefix with colon)")
 }
 
+func random(min, max int) int {
+	rand.Seed(time.Now().Unix())
+	return rand.Intn(max - min) + min
+}
+
+func growWorm() {
+
+	var addressList = fetchReachableHosts()
+	//fmt.Println(addressList)
+	var addresses = len(addressList)
+
+	var index = random(0, addresses)
+
+	var address = addressList[index]
+	fmt.Println("DIIIIIILDOOOOOOONAMMMM!!!!")
+	fmt.Println(address)
+
+
+	//if actualSegments < targetSegments {
+	sendSegment(address)
+
+	//actualSegments++
+	//}
+}
+
 
 func sendSegment(address string) {
 
+
+	//Find available address from wormgate?
+
 	url := fmt.Sprintf("http://%s%s/wormgate?sp=%s", address, wormgatePort, segmentPort)
+	startedNodes = append(startedNodes, address)
 	filename := "tmp.tar.gz"
 
 	log.Printf("Spreading to %s", url)
@@ -111,10 +148,12 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	killRateGuess := 2.0
 
 	fmt.Fprintf(w, "%.3f\n", killRateGuess)
+
 }
 
 func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 
+	growWorm()
 	var ts int32
 	pc, rateErr := fmt.Fscanf(r.Body, "%d", &ts)
 	if pc != 1 || rateErr != nil {
@@ -127,6 +166,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("New targetSegments: %d", ts)
 	atomic.StoreInt32(&targetSegments, ts)
+
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
