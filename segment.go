@@ -34,9 +34,6 @@ func main() {
 	hostaddress = strings.Split(hostname, ".")[0]
 	fmt.Println("hostaddress", hostaddress)
 
-
-
-
 	actualSegments = int32(len(startedNodes))
 	log.SetPrefix(hostname + " segment: ")
 
@@ -96,6 +93,8 @@ func selectAddress() string {
 
 func broadcast() {
 
+	fmt.Printf("\nBroadcasting: %s\n", startedNodes)
+
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/broadcast", addr, segmentPort)
 		for _, addr2 := range startedNodes {
@@ -106,6 +105,17 @@ func broadcast() {
 		}
 	}
 }
+
+func broadcastTs() {
+
+	for _, addr := range startedNodes {
+
+		url := fmt.Sprintf("http://%s%s/broadcastTs", addr, segmentPort)
+		tsBody := strings.NewReader(fmt.Sprint(targetSegments))
+		http.Post(url, "text/plain", tsBody)
+	}
+}
+
 
 func growWorm() {
 
@@ -122,15 +132,17 @@ func growWorm() {
 	fmt.Println("DIIIIIILDOOOOOOONAMMMM!!!!")
 	fmt.Println(address)
 
+	startedNodes = append(startedNodes, address)
+
 
 	if actualSegments < targetSegments {
 		sendSegment(address)
 		actualSegments = int32(len(startedNodes))
 	}
 
+	time.Sleep(500 * time.Millisecond)
+	broadcastTs()
 	broadcast()
-
-	//broadcast(startedNodes)
 	//actualSegments++
 	//}
 }
@@ -142,7 +154,6 @@ func sendSegment(address string) {
 	//Find available address from wormgate?
 
 	url := fmt.Sprintf("http://%s%s/wormgate?sp=%s", address, wormgatePort, segmentPort)
-	startedNodes = append(startedNodes, address)
 
 	//fmt.Printf("Started nodes is: %s\n", startedNodes)
 
@@ -167,8 +178,6 @@ func sendSegment(address string) {
 	}
 
 	io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close()
-
 	if resp.StatusCode == 200 {
 		log.Println("Received OK from server")
 	} else {
@@ -182,17 +191,20 @@ func startSegmentServer() {
 	http.HandleFunc("/targetsegments", targetSegmentsHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
 	http.HandleFunc("/broadcast", broadcastHandler)
+	http.HandleFunc("/broadcastTs", broadcastTsHandler)
 
 	log.Printf("Starting segment server on %s%s\n", hostname, segmentPort)
 	startedNodes = append(startedNodes, hostaddress)
+	actualSegments = int32(len(startedNodes))
 	log.Printf("Reachable hosts: %s", strings.Join(fetchReachableHosts()," "))
 	log.Printf("\nStarted nodes is: %s\n", startedNodes)
 	err := http.ListenAndServe(segmentPort, nil)
 	if err != nil {
 		log.Panic(err)
 	}
-
 }
+
+
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -226,13 +238,29 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startedNodes = retrieveAddresses(addrString)
+	actualSegments = int32(len(startedNodes))
 
 	//fmt.Println("\nGot into broadcastHandler\n")
 	fmt.Printf("Lenght og startedNodes: %d\n", len(startedNodes))
 	fmt.Printf("startedNodes is %s\n", startedNodes)
+	fmt.Printf("actual segments: %d\n", actualSegments)
+	fmt.Printf("target segments: %d\n", targetSegments)
 
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
+}
+
+func broadcastTsHandler(w http.ResponseWriter, r *http.Request) {
+
+	var bodjey int32
+	pc, rateErr := fmt.Fscanf(r.Body, "%d", &bodjey)
+	if pc != 1 || rateErr != nil {
+		log.Printf("Error parsing broadcastTs (%d items): %s", pc, rateErr)
+	}
+
+	targetSegments = int32(bodjey)
+
+	fmt.Printf("target segments: %d\n", targetSegments)
 }
 
 func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +281,8 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
 
-	growWorm()
+	go growWorm()
+	//go broadcast()
 
 }
 
