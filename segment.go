@@ -59,8 +59,6 @@ func main() {
 	default:
 		log.Fatalf("Unknown mode %q\n", os.Args[1])
 	}
-
-
 }
 
 func addCommonFlags(flagset *flag.FlagSet) {
@@ -91,28 +89,38 @@ func selectAddress() string {
 	return address
 }
 
+func stringify(input []string) string {
+	return strings.Join(input, ",")
+}
+
+
 func broadcast() {
 
 	fmt.Printf("\nBroadcasting: %s\n", startedNodes)
 
+	nodeString := stringify(startedNodes)
+
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/broadcast", addr, segmentPort)
-		for _, addr2 := range startedNodes {
-			addressBody := strings.NewReader(addr2)
+		if addr != startedNodes[0] {
+			addressBody := strings.NewReader(nodeString)
 			http.Post(url, "string", addressBody)
+		}
+		//for _, addr2 := range startedNodes {
+			//addressBody := strings.NewReader(addr2)
+			//http.Post(url, "string", addressBody)
 			//fmt.Printf("\nGot into broadcast, just sent: %s to %s\n", addr2, addr)
 			//fmt.Printf("\nWhole address list is: %s\n", startedNodes)
-		}
+		//}
 	}
 }
 
 func broadcastTs() {
 
 	for _, addr := range startedNodes {
-
 		url := fmt.Sprintf("http://%s%s/broadcastTs", addr, segmentPort)
 		tsBody := strings.NewReader(fmt.Sprint(targetSegments))
-		http.Post(url, "text/plain", tsBody)
+		http.Post(url, "int", tsBody)
 	}
 }
 
@@ -126,21 +134,19 @@ func growWorm() {
 		address = selectAddress()
 	}
 
-	fmt.Printf("actual segments: %d\n", actualSegments)
-	fmt.Printf("target segments: %d\n", targetSegments)
+	//fmt.Printf("actual segments: %d\n", actualSegments)
+	//fmt.Printf("target segments: %d\n", targetSegments)
 
-	fmt.Println("DIIIIIILDOOOOOOONAMMMM!!!!")
+	//fmt.Println("DIIIIIILDOOOOOOONAMMMM!!!!")
 	fmt.Println(address)
-
-	startedNodes = append(startedNodes, address)
-
 
 	if actualSegments < targetSegments {
 		sendSegment(address)
+		startedNodes = append(startedNodes, address)
 		actualSegments = int32(len(startedNodes))
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	//time.Sleep(1000 * time.Millisecond)
 	broadcastTs()
 	broadcast()
 	//actualSegments++
@@ -237,7 +243,15 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error parsing broadcast (%d items): %s", pc, rateErr)
 	}
 
-	startedNodes = retrieveAddresses(addrString)
+	fmt.Printf("addrString: %s\n", addrString)
+	stringList := strings.Split(addrString, ",")
+	fmt.Printf("addrString: %s\n", stringList)
+
+	for _, addr := range stringList {
+
+		startedNodes = retrieveAddresses(addr)
+	}
+
 	actualSegments = int32(len(startedNodes))
 
 	//fmt.Println("\nGot into broadcastHandler\n")
@@ -245,6 +259,10 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("startedNodes is %s\n", startedNodes)
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
+
+	if actualSegments < targetSegments {
+		growWorm()
+	}
 
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
@@ -257,6 +275,9 @@ func broadcastTsHandler(w http.ResponseWriter, r *http.Request) {
 	if pc != 1 || rateErr != nil {
 		log.Printf("Error parsing broadcastTs (%d items): %s", pc, rateErr)
 	}
+
+	io.Copy(ioutil.Discard, r.Body)
+	r.Body.Close()
 
 	targetSegments = int32(bodjey)
 
@@ -281,7 +302,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
 
-	go growWorm()
+	growWorm()
 	//go broadcast()
 
 }
