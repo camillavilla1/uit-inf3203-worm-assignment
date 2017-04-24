@@ -25,6 +25,7 @@ var targetSegments int32
 var actualSegments int32
 
 var startedNodes []string
+var reachableHosts []string
 
 
 func main() {
@@ -91,6 +92,47 @@ func selectAddress() string {
 
 func stringify(input []string) string {
 	return strings.Join(input, ",")
+}
+
+func removeElement(input []string, element string) []string {
+	for i, v := range input {
+		if v == element {
+			input = append(input[:i], input[i+1])
+			break
+		}
+	}
+
+	return input
+}
+
+func retrieveAddresses(addr string) []string {
+
+	if contains(startedNodes, addr) {
+		return startedNodes
+	} else {
+		startedNodes = append(startedNodes, addr)
+		return startedNodes
+	}
+}
+
+func heartbeat() {
+
+	for {
+		for _, addr := range reachableHosts {
+			url := fmt.Sprintf("http://%s%s/", addr, segmentPort)
+			resp, err := http.Get(url)
+			if err != nil {
+				if contains(startedNodes, addr) {
+					startedNodes = removeElement(startedNodes, addr)
+				}
+			} else {
+				_, err = ioutil.ReadAll(resp.Body)
+				startedNodes = retrieveAddresses(addr)
+				resp.Body.Close()
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 
@@ -200,10 +242,12 @@ func startSegmentServer() {
 	http.HandleFunc("/broadcastTs", broadcastTsHandler)
 
 	log.Printf("Starting segment server on %s%s\n", hostname, segmentPort)
+	reachableHosts = fetchReachableHosts()
 	startedNodes = append(startedNodes, hostaddress)
 	actualSegments = int32(len(startedNodes))
 	log.Printf("Reachable hosts: %s", strings.Join(fetchReachableHosts()," "))
 	log.Printf("\nStarted nodes is: %s\n", startedNodes)
+	go heartbeat()
 	err := http.ListenAndServe(segmentPort, nil)
 	if err != nil {
 		log.Panic(err)
@@ -224,15 +268,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func retrieveAddresses(addr string) []string {
 
-	if contains(startedNodes, addr) {
-		return startedNodes
-	} else {
-		startedNodes = append(startedNodes, addr)
-		return startedNodes
-	}
-}
 
 func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -298,6 +334,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("New targetSegments: %d", ts)
 	atomic.StoreInt32(&targetSegments, ts)
+
 
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
