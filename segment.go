@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"math/rand"
 	"time"
+	"hash/fnv"
 )
 
 var wormgatePort string
@@ -182,7 +183,7 @@ func growWorm() {
 	//fmt.Println("DIIIIIILDOOOOOOONAMMMM!!!!")
 	fmt.Println(address)
 
-	if actualSegments < targetSegments {
+	for actualSegments < targetSegments {
 		sendSegment(address)
 		startedNodes = append(startedNodes, address)
 		actualSegments = int32(len(startedNodes))
@@ -195,6 +196,36 @@ func growWorm() {
 	//}
 }
 
+func checkHash(address string) bool {
+
+	var biggest uint32
+
+	for i, addr := range startedNodes {
+
+		h := fnv.New32a()
+		h.Write([]byte(addr))
+		bs := h.Sum32()
+		fmt.Println(addr)
+		fmt.Printf("%x\n", bs)
+
+		if i == 0 {
+			biggest = bs
+		} else {
+			if bs > biggest {
+				biggest = bs
+			}
+		}
+	}
+
+	h := fnv.New32a()
+	h.Write([]byte(address))
+	hashedAddress := h.Sum32()
+	if biggest == hashedAddress {
+		return true
+	} else {
+		return false
+	}
+}
 
 func sendSegment(address string) {
 
@@ -296,9 +327,9 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
 
-	if actualSegments < targetSegments {
-		growWorm()
-	}
+	//if actualSegments < targetSegments {
+		//growWorm()
+	//}
 
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
@@ -339,7 +370,9 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("actual segments: %d\n", actualSegments)
 	fmt.Printf("target segments: %d\n", targetSegments)
 
-	growWorm()
+	if checkHash(hostaddress) {
+		growWorm()
+	}
 	//go broadcast()
 
 }
