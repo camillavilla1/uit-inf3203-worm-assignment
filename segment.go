@@ -148,6 +148,8 @@ func heartbeat() {
 				if contains(startedNodes, addr) {
 					startedNodes = removeElement(startedNodes, addr)
 				}
+				//_, err = ioutil.ReadAll(resp.Body)
+				//resp.Body.Close()
 			} else {
 				_, err = ioutil.ReadAll(resp.Body)
 				startedNodes = retrieveAddresses(addr)
@@ -167,8 +169,11 @@ func broadcast() {
 	//res := removeDuplicatesUnordered(startedNodes)
 	//fmt.Printf("\n\n[BROADCAST] RESULT: : %s\n", res)	
 	//nodeString := stringify(res)
-	
-	nodeString := stringify(startedNodes)
+
+	var nodeString string
+	nodeString = ""
+
+	nodeString = stringify(startedNodes)
 
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/broadcast", addr, segmentPort)
@@ -196,34 +201,45 @@ func broadcastTs() {
 	}
 }
 
+func selectAvailableAddress() string{
+
+	var address = selectAddress()
+	for contains(startedNodes, address) {
+		address = selectAddress()
+		fmt.Printf("\n[selectAvailableAddress] Selected new address is: %s\n", address)
+	}
+
+	return address
+}
+
 
 func growWorm() {
 
 	fmt.Printf("\n------------\nGrowing worm!\n----------------\n")
 
-	var address = selectAddress()
-	fmt.Printf("\n[GrowWorm] Address is %s and should not be in started nodes: %s\n", address, startedNodes)
-	for contains(startedNodes, address) {
-		address = selectAddress()
-		fmt.Printf("\n[GrowWorm] Selected new address is: %s\n", address)
-	}
+	//var address = selectAddress()
+	//fmt.Printf("\n[GrowWorm] Address is %s and should not be in started nodes: %s\n", address, startedNodes)
+	//for contains(startedNodes, address) {
+		//address = selectAddress()
+		//fmt.Printf("\n[GrowWorm] Selected new address is: %s\n", address)
+	//}
 
-	fmt.Println(address)
+	//fmt.Println(address)
 
 	for actualSegments < targetSegments {
+		address := selectAvailableAddress()
+		fmt.Println(address)
 		fmt.Printf("\n[growWorm] Growing worm (as: %d, ts: %d)\n", actualSegments, targetSegments)
 		sendSegment(address)
 		startedNodes = append(startedNodes, address)
-		
+
 		//res3 := removeDuplicatesUnordered(startedNodes)
 		//fmt.Printf("\n\n############\n[GrowWorm] Started Nodes res3 are: %s\n#################\n", res3)
 		//actualSegments = int32(len(res3))
-		
-		startedNodes = append(startedNodes, address)
+
 		fmt.Printf("\n[GrowWorm] Started Nodes are: %s\n", startedNodes)
 		actualSegments = int32(len(startedNodes))
 
-		
 	}
 
 	broadcastTs()
@@ -409,6 +425,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("[targetSegmentsHandler]target segments: %d\n", targetSegments)
 
 	if checkHash(hostaddress) {
+		fmt.Printf("\nIs chief, growing worm...\n")
 		growWorm()
 	}
 	//go broadcast()
