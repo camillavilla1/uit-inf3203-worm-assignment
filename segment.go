@@ -76,7 +76,7 @@ func random(min, max int) int {
 }
 
 //Check if a value is in a list/slice and return true or false
-func contains(s []string, e string) bool {
+func listContains(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
 			return true
@@ -158,7 +158,7 @@ func removeDuplicatesUnordered(elements []string) []string {
 //Get address, check if it is started nodes slice, if not: append the address
 func retrieveAddresses(addr string) []string {
 
-	if contains(startedNodes, addr) {
+	if listContains(startedNodes, addr) {
 		return startedNodes
 	} else {
 		startedNodes = append(startedNodes, addr)
@@ -175,11 +175,16 @@ func heartbeat() {
 			if addr != hostaddress {
 				resp, err := http.Get(url)
 				if err != nil {
-					if contains(startedNodes, addr) {
-						startedNodes = removeElement(startedNodes, addr)
+					if listContains(startedNodes, addr) {
+						checkHash(hostaddress)
+						tellChief()
+						//startedNodes = removeElement(startedNodes, addr)
+						//actualSegments = int32(len(startedNodes))
 					}
+					
 					//_, err = ioutil.ReadAll(resp.Body)
 					//resp.Body.Close()
+
 				} else {
 					_, err = ioutil.ReadAll(resp.Body)
 					startedNodes = retrieveAddresses(addr)
@@ -187,8 +192,30 @@ func heartbeat() {
 				}
 			}
 		}
-		time.Sleep(500 * time.Millisecond)
+		
+		time.Sleep(250 * time.Millisecond)
 	}
+}
+
+func checkList() {
+	for _, addr := range reachableHosts {
+		url := fmt.Sprintf("http://%s%s/", addr, segmentPort)
+		if addr != hostaddress {
+			resp, err := http.Get(url)
+			if err != nil {
+				//if listContains(startedNodes, addr) {	
+				fmt.Printf("in checklist: nodelist: %s", startedNodes)
+				startedNodes = removeElement(startedNodes, addr)
+				fmt.Printf("\nREMOVED in checklist: nodelist: %s", startedNodes)
+				actualSegments = int32(len(startedNodes))
+				//}
+			} else {
+				_, err = ioutil.ReadAll(resp.Body)
+				startedNodes = retrieveAddresses(addr)
+				resp.Body.Close()
+			}
+		}
+	} 
 }
 
 //broadcast addresses to every active node
@@ -224,7 +251,7 @@ func broadcastTs() {
 func selectAvailableAddress() string{
 
 	var address = selectAddress()
-	for contains(startedNodes, address) {
+	for listContains(startedNodes, address) {
 		address = selectAddress()
 		//fmt.Printf("\n[selectAvailableAddress] Selected new address is: %s\n", address)
 	}
@@ -265,7 +292,10 @@ func growOrShrinkWorm() {
 			addressBody := strings.NewReader(message)
 			http.Post(url, "string", addressBody)
 			fmt.Printf("\n[growOrShrinkWorm] Removing %s address\n", address)
-			startedNodes = removeElement(startedNodes, address)
+			
+			if listContains(startedNodes, address) {
+				startedNodes = removeElement(startedNodes, address)
+			}
 			actualSegments = int32(len(startedNodes))
 			fmt.Printf("\n[growOrShrinkWorm] Told %s to kill themselves\n", url)
 			fmt.Printf("[growOrShrinkWorm] Started nodes is %s\n", startedNodes)
@@ -461,7 +491,13 @@ func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	r.Body.Close()
 
 	fmt.Printf("Chief here! Growign worm, affirmative!\n")
-	growOrShrinkWorm()
+	fmt.Printf("chiefs actual segements: %d\n", actualSegments)
+	fmt.Printf("chiefs target segements: %d\n", targetSegments)
+	checkList()
+	if actualSegments != targetSegments {
+		fmt.Printf("chiefs segments unequal, should shrink or grow\n")
+		growOrShrinkWorm()
+	}
 }
 
 func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
@@ -484,7 +520,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("[targetSegmentsHandler]target segments: %d\n", targetSegments)
 
 	if checkHash(hostaddress) {
-		fmt.Printf("\nIs chief, growing worm...\n")
+		fmt.Printf("\nIs chief, growing or shrinking worm...\n")
 		growOrShrinkWorm()
 	} else {
 		tellChief()
