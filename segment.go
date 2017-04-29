@@ -109,7 +109,7 @@ func stringify(input []string) string {
 }
 
 //Remove a element in a slice
-func removeElement(input []string, element string) []string {
+/*func removeElement(input []string, element string) []string {
 	for i, v := range input {
 		if v == element {
 			input = append(input[:i], input[i+1])
@@ -118,7 +118,25 @@ func removeElement(input []string, element string) []string {
 	}
 
 	return input
+}*/
+
+
+//Remove a element in a slice
+func removeElement(input []string, element string) []string {
+	for i, v := range input {
+		if len(input) == 1 {
+			input = append(input[:i])
+		}else {
+			if v == element {
+				input = append(input[:i], input[i+1])
+				break
+			}
+		}
+		
+	}
+	return input
 }
+
 
 //Remove duplicates in a slice
 func removeDuplicatesUnordered(elements []string) []string {
@@ -215,25 +233,27 @@ func selectAvailableAddress() string{
 }
 
 
-func growWorm() {
-
-	fmt.Printf("\n------------\nGrowing worm!\n----------------\n")
+func growOrShrinkWorm() {
+	//fmt.Printf("\n------------\nGrowing or shrinking worm!\n----------------\n")
 	if actualSegments < targetSegments {
 
 		for actualSegments < targetSegments {
+			fmt.Printf("\n------------\nGrowing worm!\n-------------\n")
 			address := selectAvailableAddress()
 			fmt.Println(address)
-			fmt.Printf("\n[growWorm] Growing worm (as: %d, ts: %d)\n", actualSegments, targetSegments)
+			fmt.Printf("\n[growOrShrinkWorm] Growing worm (as: %d, ts: %d)\n", actualSegments, targetSegments)
 			sendSegment(address)
 			startedNodes = append(startedNodes, address)
 
-			fmt.Printf("\n[GrowWorm] Started Nodes are: %s\n", startedNodes)
+			fmt.Printf("\n[growOrShrinkWorm] Started Nodes are: %s\n", startedNodes)
 			actualSegments = int32(len(startedNodes))
 			broadcastTs()
 			broadcast()
+			fmt.Printf("\n------------\nFinished growing worm!\nBroadcasted ts and normal broadcast\n-------------\n")
 		}
 	} else if actualSegments > targetSegments {
 		for actualSegments > targetSegments {
+			fmt.Printf("\n------------\nShrinking worm!\n-------------\n")
 
 			var address = selectStartedAddress()
 			for address == hostaddress {
@@ -244,15 +264,15 @@ func growWorm() {
 			message := "u dead"
 			addressBody := strings.NewReader(message)
 			http.Post(url, "string", addressBody)
-			fmt.Printf("\n[growWorm] Removing %s address\n", address)
+			fmt.Printf("\n[growOrShrinkWorm] Removing %s address\n", address)
 			startedNodes = removeElement(startedNodes, address)
 			actualSegments = int32(len(startedNodes))
-			fmt.Printf("\n[growWorm] Told %s to kill themselves\n", url)
-			fmt.Printf("[growWorm] Started nodes is %s\n", startedNodes)
-			fmt.Printf("[growWorm] actual segments = %d\n", actualSegments)
+			fmt.Printf("\n[growOrShrinkWorm] Told %s to kill themselves\n", url)
+			fmt.Printf("[growOrShrinkWorm] Started nodes is %s\n", startedNodes)
+			fmt.Printf("[growOrShrinkWorm] actual segments = %d\n", actualSegments)
 			broadcastTs()
 			broadcast()
-
+			fmt.Printf("\n------------\nFinished shrinking worm!\nBroadcasted ts and normal broadcast\n-------------\n")
 			//}
 		}
 	}
@@ -399,8 +419,8 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 	actualSegments = int32(len(startedNodes))
 
 	//fmt.Println("\nGot into broadcastHandler\n")
+	//fmt.Printf("[broadcastHandler] startedNodes is %s\n", startedNodes)
 	fmt.Printf("[broadcastHandler] Lenght og startedNodes: %d\n", len(startedNodes))
-	fmt.Printf("[broadcastHandler] startedNodes is %s\n", startedNodes)
 	fmt.Printf("[broadcastHandler] actual segments: %d\n", actualSegments)
 	fmt.Printf("[broadcastHandler] target segments: %d\n", targetSegments)
 
@@ -441,7 +461,7 @@ func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	r.Body.Close()
 
 	fmt.Printf("Chief here! Growign worm, affirmative!\n")
-	growWorm()
+	growOrShrinkWorm()
 }
 
 func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
@@ -465,7 +485,7 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if checkHash(hostaddress) {
 		fmt.Printf("\nIs chief, growing worm...\n")
-		growWorm()
+		growOrShrinkWorm()
 	} else {
 		tellChief()
 	}
