@@ -122,7 +122,7 @@ func stringify(input []string) string {
 
 
 //Remove a element in a slice
-func removeElement(input []string, element string) []string {
+/*func removeElement(input []string, element string) []string {
 	for i, v := range input {
 		if len(input) == 1 {
 			input = append(input[:i])
@@ -135,7 +135,23 @@ func removeElement(input []string, element string) []string {
 		
 	}
 	return input
+}*/
+
+//In the other remove-function we didnt have s[i+1:] COLON!!!
+func removeElement(s []string, r string) []string {
+	for i, v := range s {
+		if len(s) == 1 {
+			fmt.Println("hello")
+			s = append(s[:i])
+		}else {
+			if v == r {
+				return append(s[:i], s[i+1:]...)
+			}
+		}
+	}
+	return s
 }
+
 
 
 //Remove duplicates in a slice
@@ -198,15 +214,15 @@ func heartbeat() {
 }
 
 func checkList() {
-	for _, addr := range reachableHosts {
+	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/", addr, segmentPort)
 		if addr != hostaddress {
 			resp, err := http.Get(url)
 			if err != nil {
 				//if listContains(startedNodes, addr) {	
-				fmt.Printf("in checklist: nodelist: %s", startedNodes)
+				fmt.Printf("\n[Checklist]: Address %s should be removed from nodelist: %s", addr, startedNodes)
 				startedNodes = removeElement(startedNodes, addr)
-				fmt.Printf("\nREMOVED in checklist: nodelist: %s", startedNodes)
+				fmt.Printf("[Checklist - REMOVED element] in nodelist: %s\n\n", startedNodes)
 				actualSegments = int32(len(startedNodes))
 				//}
 			} else {
@@ -294,6 +310,7 @@ func growOrShrinkWorm() {
 			fmt.Printf("\n[growOrShrinkWorm] Removing %s address\n", address)
 			
 			if listContains(startedNodes, address) {
+				fmt.Printf("\n[growOrShrinkWorm] Address %s should be removed from startedNodes: %s\n", address, startedNodes)
 				startedNodes = removeElement(startedNodes, address)
 			}
 			actualSegments = int32(len(startedNodes))
@@ -490,9 +507,10 @@ func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
 
-	fmt.Printf("Chief here! Growign worm, affirmative!\n")
-	fmt.Printf("chiefs actual segements: %d\n", actualSegments)
-	fmt.Printf("chiefs target segements: %d\n", targetSegments)
+	fmt.Printf("[chiefHandler] Chief here! Growign worm, affirmative!\n")
+	fmt.Printf("[chiefHandler] chiefs actual segements: %d\n", actualSegments)
+	fmt.Printf("[chiefHandler] chiefs target segements: %d\n", targetSegments)
+	fmt.Printf("[chiefHandler] startedNodes are {%s}. \n Also checking checklist..\n", startedNodes)
 	checkList()
 	if actualSegments != targetSegments {
 		fmt.Printf("chiefs segments unequal, should shrink or grow\n")
