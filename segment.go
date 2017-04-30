@@ -108,18 +108,6 @@ func stringify(input []string) string {
 	return strings.Join(input, ",")
 }
 
-//Remove a element in a slice
-/*func removeElement(input []string, element string) []string {
-	for i, v := range input {
-		if v == element {
-			input = append(input[:i], input[i+1])
-			break
-		}
-	}
-
-	return input
-}*/
-
 
 //Remove a element in a slice
 /*func removeElement(input []string, element string) []string {
@@ -153,24 +141,6 @@ func removeElement(s []string, r string) []string {
 }
 
 
-
-//Remove duplicates in a slice
-func removeDuplicatesUnordered(elements []string) []string {
-    encountered := map[string]bool{}
-
-    // Create a map of all unique elements.
-    for v:= range elements {
-	encountered[elements[v]] = true
-    }
-
-    // Place all keys from the map into a slice.
-    result := []string{}
-    for key, _ := range encountered {
-	result = append(result, key)
-    }
-    return result
-}
-
 //Get address, check if it is started nodes slice, if not: append the address
 func retrieveAddresses(addr string) []string {
 
@@ -197,7 +167,6 @@ func heartbeat() {
 						//startedNodes = removeElement(startedNodes, addr)
 						//actualSegments = int32(len(startedNodes))
 					}
-					
 					//_, err = ioutil.ReadAll(resp.Body)
 					//resp.Body.Close()
 
@@ -277,7 +246,6 @@ func selectAvailableAddress() string{
 
 
 func growOrShrinkWorm() {
-	//fmt.Printf("\n------------\nGrowing or shrinking worm!\n----------------\n")
 	if actualSegments < targetSegments {
 
 		for actualSegments < targetSegments {
@@ -372,10 +340,7 @@ func tellChief() {
 }
 
 func sendSegment(address string) {
-
-
 	//Find available address from wormgate?
-
 	url := fmt.Sprintf("http://%s%s/wormgate?sp=%s", address, wormgatePort, segmentPort)
 
 	filename := "tmp.tar.gz"
@@ -431,7 +396,6 @@ func startSegmentServer() {
 
 
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-
 	// We don't use the request body. But we should consume it anyway.
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
@@ -439,13 +403,11 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	killRateGuess := 2.0
 
 	fmt.Fprintf(w, "%.3f\n", killRateGuess)
-
 }
 
 
 
 func broadcastHandler(w http.ResponseWriter, r *http.Request) {
-
 	var addrString string
 
 	pc, rateErr := fmt.Fscanf(r.Body, "%s", &addrString)
@@ -465,8 +427,6 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 
 	actualSegments = int32(len(startedNodes))
 
-	//fmt.Println("\nGot into broadcastHandler\n")
-	//fmt.Printf("[broadcastHandler] startedNodes is %s\n", startedNodes)
 	fmt.Printf("[broadcastHandler] Lenght og startedNodes: %d\n", len(startedNodes))
 	fmt.Printf("[broadcastHandler] actual segments: %d\n", actualSegments)
 	fmt.Printf("[broadcastHandler] target segments: %d\n", targetSegments)
@@ -543,12 +503,9 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		tellChief()
 	}
-	//go broadcast()
-
 }
 
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
-
 	// Consume and close body
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
