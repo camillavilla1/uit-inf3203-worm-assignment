@@ -36,7 +36,6 @@ func main() {
 	hostname, _ = os.Hostname()
 
 	hostaddress = strings.Split(hostname, ".")[0]
-	fmt.Println("hostaddress", hostaddress)
 
 	actualSegments = int32(len(startedNodes))
 	log.SetPrefix(hostname + " segment: ")
@@ -108,23 +107,6 @@ func stringify(input []string) string {
 	return strings.Join(input, ",")
 }
 
-
-//Remove a element in a slice
-/*func removeElement(input []string, element string) []string {
-	for i, v := range input {
-		if len(input) == 1 {
-			input = append(input[:i])
-		}else {
-			if v == element {
-				input = append(input[:i], input[i+1])
-				break
-			}
-		}
-		
-	}
-	return input
-}*/
-
 //In the other remove-function we didnt have s[i+1:] COLON!!!
 func removeElement(s []string, r string) []string {
 	for i, v := range s {
@@ -153,7 +135,6 @@ func retrieveAddresses(addr string) []string {
 
 //Ping all reachable host to check if dead or alive
 func heartbeat() {
-	log.Printf("\n\nHeartbeating nodes\n")
 	for {
 		for _, addr := range reachableHosts {
 			url := fmt.Sprintf("http://%s%s/", addr, segmentPort)
@@ -163,12 +144,7 @@ func heartbeat() {
 					if listContains(startedNodes, addr) {
 						checkHash(hostaddress)
 						tellChief()
-						//startedNodes = removeElement(startedNodes, addr)
-						//actualSegments = int32(len(startedNodes))
 					}
-					//_, err = ioutil.ReadAll(resp.Body)
-					//resp.Body.Close()
-
 				} else {
 					_, err = ioutil.ReadAll(resp.Body)
 					startedNodes = retrieveAddresses(addr)
@@ -186,12 +162,8 @@ func checkList() {
 		if addr != hostaddress {
 			resp, err := http.Get(url)
 			if err != nil {
-				//if listContains(startedNodes, addr) {	
-				fmt.Printf("\n[Checklist]: Address %s should be removed from nodelist: %s", addr, startedNodes)
 				startedNodes = removeElement(startedNodes, addr)
-				fmt.Printf("[Checklist - REMOVED element] in nodelist: %s\n\n", startedNodes)
 				actualSegments = int32(len(startedNodes))
-				//}
 			} else {
 				_, err = ioutil.ReadAll(resp.Body)
 				startedNodes = retrieveAddresses(addr)
@@ -203,19 +175,25 @@ func checkList() {
 
 //broadcast addresses to every active node
 func broadcast() {
-	fmt.Printf("\nBroadcasting: %s\n", startedNodes)
-
 	var nodeString string
 	nodeString = ""
 
 	nodeString = stringify(startedNodes)
-
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/broadcast", addr, segmentPort)
 		if addr != hostaddress {
 			addressBody := strings.NewReader(nodeString)
 			http.Post(url, "string", addressBody)
-			fmt.Printf("\n[broadcast] Broadcast to %s with addressbody: %s\n", url, addressBody)
+		}
+	}
+}
+
+func broadcastShutdown() {
+	for _, addr := range startedNodes {
+		url := fmt.Sprintf("http://%s%s/shutdown1", addr, segmentPort)
+		if addr != hostaddress {
+			addressBody := strings.NewReader("You dead!")
+			http.Post(url, "string", addressBody)
 		}
 	}
 }
@@ -226,7 +204,6 @@ func broadcastTs() {
 		url := fmt.Sprintf("http://%s%s/broadcastTs", addr, segmentPort)
 		tsBody := strings.NewReader(fmt.Sprint(targetSegments))
 		http.Post(url, "int", tsBody)
-		fmt.Printf("\n[broadcastTs] Broadcast TS to %s with addressbody: %s\n", url, tsBody)
 	}
 }
 
@@ -242,51 +219,33 @@ func selectAvailableAddress() string{
 func growOrShrinkWorm() {
 	if actualSegments < targetSegments {
 		for actualSegments < targetSegments {
-			fmt.Printf("\n------------\nGrowing worm!\n-------------\n")
 			address := selectAvailableAddress()
-			fmt.Println(address)
-			fmt.Printf("\n[growOrShrinkWorm] Growing worm (as: %d, ts: %d)\n", actualSegments, targetSegments)
 			sendSegment(address)
 			startedNodes = append(startedNodes, address)
-
-			fmt.Printf("\n[growOrShrinkWorm] Started Nodes are: %s\n", startedNodes)
 			actualSegments = int32(len(startedNodes))
 			
 			broadcastTs()
 			broadcast()
-
-			fmt.Printf("\n------------\nFinished growing worm!\nBroadcasted ts and normal broadcast\n-------------\n")
 		}
 	} else if actualSegments > targetSegments {
 		for actualSegments > targetSegments {
-			fmt.Printf("\n------------\nShrinking worm!\n-------------\n")
-
 			var address = selectStartedAddress()
 			for address == hostaddress {
 				address = selectStartedAddress()
 			}
-			//if address != hostaddress {
-			url := fmt.Sprintf("http://%s%s/shutdown", address, segmentPort)
+
+			url := fmt.Sprintf("http://%s%s/shutdown1", address, segmentPort)
 			message := "u dead"
 			addressBody := strings.NewReader(message)
 			http.Post(url, "string", addressBody)
-			fmt.Printf("\n[growOrShrinkWorm] Removing %s address\n", address)
 			
 			if listContains(startedNodes, address) {
-				fmt.Printf("\n[growOrShrinkWorm] Address %s should be removed from startedNodes: %s\n", address, startedNodes)
 				startedNodes = removeElement(startedNodes, address)
 			}
-
 			actualSegments = int32(len(startedNodes))
-			fmt.Printf("\n[growOrShrinkWorm] Told %s to kill themselves\n", url)
-			fmt.Printf("[growOrShrinkWorm] Started nodes is %s\n", startedNodes)
-			fmt.Printf("[growOrShrinkWorm] actual segments = %d\n", actualSegments)
 
 			broadcastTs()
 			broadcast()
-
-			fmt.Printf("\n------------\nFinished shrinking worm!\nBroadcasted ts and normal broadcast\n-------------\n")
-			//}
 		}
 	}
 }
@@ -298,7 +257,6 @@ func checkHash(address string) bool {
 		h := fnv.New32a()
 		h.Write([]byte(addr))
 		bs := h.Sum32()
-		fmt.Println(addr)
 
 		if i == 0 {
 			biggest = bs
@@ -315,10 +273,8 @@ func checkHash(address string) bool {
 	h.Write([]byte(address))
 	hashedAddress := h.Sum32()
 	if biggest == hashedAddress {
-		fmt.Println("[checkHash] Returned True, hostaddress is biggest")
 		return true
 	} else {
-		fmt.Println("[checkHash] Returned False")
 		return false
 	}
 }
@@ -329,7 +285,6 @@ func tellChief() {
 	message := "you the man!"
 	addressBody := strings.NewReader(message)
 	http.Post(url, "string", addressBody)
-	fmt.Printf("\n[tellChief] Told chief %s with addressbody: %s. And broadcasted TS\n", url, message)
 }
 
 func sendSegment(address string) {
@@ -367,7 +322,8 @@ func startSegmentServer() {
 	//func HandleFunc(pattern string, handler func(ResponseWriter, *Request))
 	http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/targetsegments", targetSegmentsHandler)
-	http.HandleFunc("/shutdown", shutdownHandler)
+	http.HandleFunc("/shutdown1", shutdownHandler)
+	http.HandleFunc("/shutdown", shutdownAllHandler)
 	http.HandleFunc("/broadcast", broadcastHandler)
 	http.HandleFunc("/broadcastTs", broadcastTsHandler)
 	http.HandleFunc("/chief", chiefHandler)
@@ -379,8 +335,9 @@ func startSegmentServer() {
 
 	actualSegments = int32(len(startedNodes))
 	log.Printf("Reachable hosts: %s", strings.Join(fetchReachableHosts()," "))
-	log.Printf("\nStarted nodes is: %s\n", startedNodes)
+
 	go heartbeat()
+	
 	err := http.ListenAndServe(segmentPort, nil)
 	if err != nil {
 		log.Panic(err)
@@ -409,23 +366,12 @@ func broadcastHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error parsing broadcast (%d items): %s", pc, rateErr)
 	}
 
-	//fmt.Printf("[broadcastHandler] Addresstring {%s} from body.\n", addrString)
 	stringList := strings.Split(addrString, ",")
 
 	for _, addr := range stringList {
 		startedNodes = retrieveAddresses(addr)
-		fmt.Printf("\n\n[Broadcast handler] Started nodes from stringList: %s\n", startedNodes)
 	}
-
 	actualSegments = int32(len(startedNodes))
-
-	fmt.Printf("[broadcastHandler] Lenght og startedNodes: %d\n", len(startedNodes))
-	fmt.Printf("[broadcastHandler] actual segments: %d\n", actualSegments)
-	fmt.Printf("[broadcastHandler] target segments: %d\n", targetSegments)
-
-	//if actualSegments < targetSegments {
-		//growWorm()
-	//}
 
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
@@ -443,8 +389,6 @@ func broadcastTsHandler(w http.ResponseWriter, r *http.Request) {
 	r.Body.Close()
 
 	targetSegments = int32(bodjey)
-
-	fmt.Printf("[BroadcastTsHandler] target segments: %d\n", targetSegments)
 }
 
 func chiefHandler(w http.ResponseWriter, r *http.Request) {
@@ -458,13 +402,8 @@ func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
 
-	fmt.Printf("[chiefHandler] Chief here! Growign worm, affirmative!\n")
-	fmt.Printf("[chiefHandler] chiefs actual segements: %d\n", actualSegments)
-	fmt.Printf("[chiefHandler] chiefs target segements: %d\n", targetSegments)
-	fmt.Printf("[chiefHandler] startedNodes are {%s}. \n Also checking checklist..\n", startedNodes)
 	checkList()
 	if actualSegments != targetSegments {
-		fmt.Printf("chiefs segments unequal, should shrink or grow\n")
 		growOrShrinkWorm()
 	}
 }
@@ -480,15 +419,9 @@ func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
 
-	log.Printf("[targetSegmentsHandler] New targetSegments: %d", ts)
 	atomic.StoreInt32(&targetSegments, ts)
 
-
-	fmt.Printf("[targetSegmentsHandler] actual segments: %d\n", actualSegments)
-	fmt.Printf("[targetSegmentsHandler] target segments: %d\n", targetSegments)
-
 	if checkHash(hostaddress) {
-		fmt.Printf("\nIs chief, growing or shrinking worm...\n")
 		growOrShrinkWorm()
 	} else {
 		tellChief()
@@ -500,10 +433,17 @@ func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(ioutil.Discard, r.Body)
 	r.Body.Close()
 
-	//startedNodes = removeElement(startedNodes, hostaddress)
-	//targetSegments = int32(len(startedNodes))
-	//broadcast()
-	//tellChief()
+	// Shut down
+	log.Printf("Received shutdown command, committing suicide")
+	os.Exit(0)
+}
+
+func shutdownAllHandler(w http.ResponseWriter, r *http.Request) {
+	// Consume and close body
+	io.Copy(ioutil.Discard, r.Body)
+	r.Body.Close()
+
+	broadcastShutdown()
 
 	// Shut down
 	log.Printf("Received shutdown command, committing suicide")
