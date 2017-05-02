@@ -94,6 +94,7 @@ func selectAddress() string {
 	return address
 }
 
+//Select a node from all started nodes in cluster
 func selectStartedAddress() string {
 	var addressList = startedNodes
 	var addresses = len(addressList)
@@ -107,7 +108,7 @@ func stringify(input []string) string {
 	return strings.Join(input, ",")
 }
 
-//In the other remove-function we didnt have s[i+1:] COLON!!!
+//Remove element in a slice
 func removeElement(s []string, r string) []string {
 	for i, v := range s {
 		if len(s) == 1 {
@@ -156,6 +157,7 @@ func heartbeat() {
 	}
 }
 
+//Check if started nodes are dead or alive
 func checkList() {
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/", addr, segmentPort)
@@ -188,6 +190,7 @@ func broadcast() {
 	}
 }
 
+//Broadcast shutdown nodes
 func broadcastShutdown() {
 	for _, addr := range startedNodes {
 		url := fmt.Sprintf("http://%s%s/shutdown1", addr, segmentPort)
@@ -215,7 +218,7 @@ func selectAvailableAddress() string{
 	return address
 }
 
-
+//Grow or shrink worm depending on +/- 
 func growOrShrinkWorm() {
 	if actualSegments < targetSegments {
 		for actualSegments < targetSegments {
@@ -250,6 +253,7 @@ func growOrShrinkWorm() {
 	}
 }
 
+//Finds a leader that should start a new node
 func checkHash(address string) bool {
 	var biggest uint32
 
@@ -391,6 +395,7 @@ func broadcastTsHandler(w http.ResponseWriter, r *http.Request) {
 	targetSegments = int32(bodjey)
 }
 
+//Cheif should check the started nodes and grow or shrink worm.
 func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	var addrString string
 
@@ -408,6 +413,8 @@ func chiefHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//If your chief, you should start a new node or kill a node, else
+//you should tell chief about status (+/-)
 func targetSegmentsHandler(w http.ResponseWriter, r *http.Request) {
 	var ts int32
 	pc, rateErr := fmt.Fscanf(r.Body, "%d", &ts)
